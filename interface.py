@@ -19,10 +19,12 @@ def carregar_usuarios_json():
     # Verifica se o arquivo do json existe, se não existir retorna uma lista vazia
     if not os.path.exists('usuarios.json'):
         return []
-    
-    # Abre o json atual, e transforma em um objeto python
-    with open('usuarios.json', "r") as arq:
-        return json.load(arq)
+    try:
+        # Abre o json atual, e transforma em um objeto python
+        with open('usuarios.json', "r") as arq:
+            return json.load(arq)
+    except:
+        return []
 
 def salvar_usuarios(usuarios):
     # Reescreve o json, com a nova lista passada

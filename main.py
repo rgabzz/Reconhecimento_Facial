@@ -15,10 +15,12 @@ def registrar_log(usuario, status):
         logs.write(f"{data}, {usuario}, {status}\n")
 
 def carregar_arquivos(pasta="rostos"):
-
-    # Pegamos os dados do json, onde tem as pessoas cadastradas
-    with open("usuarios.json", "r") as arq_json:
-        dados_json = json.load(arq_json)
+    try:
+        # Pegamos os dados do json, onde tem as pessoas cadastradas
+        with open("usuarios.json", "r") as arq_json:
+            dados_json = json.load(arq_json)
+    except:
+        print('Arquivo Vazio')
 
     # Pegamos o nome dos arquivos dentro da pasta
     nome_arquivos = []
