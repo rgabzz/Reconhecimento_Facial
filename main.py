@@ -4,6 +4,10 @@ import os
 from datetime import datetime
 import json
 import time
+import serial
+
+porta_serial = serial.Serial("COM3", 9600)  # 9600 é a taxa padrão do Arduino
+time.sleep(2)  # Espera o Arduino resetar
 
 def registrar_log(usuario, status):
     # Pegamos a data e o horário atual de hoje
@@ -130,6 +134,13 @@ def main():
 
                             # Registra no arquivo que o usuário reconhecido abriu a porta
                             registrar_log(usuario=nome_reconhecido,status='LIBERADO')
+
+                            print('Abrindo Porta...')
+                            porta_serial.write(b'A')
+
+                            time.sleep(3)
+                            print("Fechando porta.")
+                            porta_serial.write(b'F') 
 
                             # Quebra o loop, pois já encontrou o rosto
                             break
