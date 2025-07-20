@@ -180,9 +180,6 @@ def main():
         # Mostra o que está aparecendo na webcam, em uma tela de frame
         cv2.imshow("Reconhecimento Facial", frame)
 
-        if reconhecido:
-            time.sleep(3)
-
         # Se a tecla 27 (ESC) for pressionada, fecha o programa
         if cv2.waitKey(1) == 27:  
             break
