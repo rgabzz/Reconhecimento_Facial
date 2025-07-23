@@ -6,7 +6,7 @@ import json
 import time
 import serial
 
-porta_serial = serial.Serial("COM3", 9600)  # 9600 é a taxa padrão do Arduino
+porta_serial = serial.Serial("COM5", 9600)  # 9600 é a taxa padrão do Arduino
 time.sleep(2)  # Espera o Arduino resetar
 
 def registrar_log(usuario, status):
@@ -138,9 +138,9 @@ def main():
                             print('Abrindo Porta...')
                             porta_serial.write(b'A')
 
-                            time.sleep(3)
+                            time.sleep(10)
                             print("Fechando porta.")
-                            porta_serial.write(b'F') 
+                            porta_serial.write(b'F')    
 
                             # Quebra o loop, pois já encontrou o rosto
                             break
