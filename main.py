@@ -73,8 +73,8 @@ def main():
 
     # Define a câmera, e configura o tamanho do frame que será mostrado ao usuário.
     cam = cv2.VideoCapture(0)
-    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
     cooldown_segundos = 10  # intervalo mínimo entre reconhecimentos
     ultimo_reconhecimento = None # defini a variavel do ultimo reconhecimento, usada na logica do cooldown
@@ -120,7 +120,7 @@ def main():
                 for i, rosto_ref in enumerate(rostos_ref):
                     try:
                         # Faz a verificação se o rosto atual é igual a algum dos rostos armazenados
-                        if DeepFace.verify(img1_path=rosto_capturado,img2_path=rosto_ref, enforce_detection=False)["verified"]:
+                        if DeepFace.verify(img1_path=rosto_capturado,img2_path=rosto_ref, enforce_detection=False, model_name="Facenet")["verified"]:
 
                             # Atualiza o status de reconhecido e salva o nome
                             reconhecido = True
@@ -138,7 +138,7 @@ def main():
                             print('Abrindo Porta...')
                             porta_serial.write(b'A')
 
-                            time.sleep(10)
+                            time.sleep(5)
                             print("Fechando porta.")
                             porta_serial.write(b'F')    
 
