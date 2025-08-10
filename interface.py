@@ -1,192 +1,230 @@
 from tkinter import *
-from tkinter import simpledialog, messagebox,Scrollbar
+from tkinter import simpledialog, messagebox, Scrollbar
 import json
 import os
-from werkzeug.security import generate_password_hash,check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 import cv2
 from datetime import datetime
+from deepface import DeepFace
 
-# Criação da Janela
+# Inicializa o backend usado pela DeepFace (pode ser 'retinaface', 'mtcnn', etc)
+backend = 'opencv'  # Usamos 'opencv' por ser leve e rápido
+
+# Criação da janela principal
 janela = Tk()
 janela.geometry('350x400')
 janela.title('Administrador - Fechadura Facial')
 
-# SENHA ATUAL
+# Geração da senha (criptografada) para login
 PASSWORD = generate_password_hash("1234")
 
-# Funções json
+# Função que carrega a lista de usuários a partir de um arquivo JSON
 def carregar_usuarios_json():
-    # Verifica se o arquivo do json existe, se não existir retorna uma lista vazia
     if not os.path.exists('usuarios.json'):
         return []
     try:
-        # Abre o json atual, e transforma em um objeto python
         with open('usuarios.json', "r") as arq:
             return json.load(arq)
     except:
         return []
 
+# Função que salva a lista de usuários no arquivo JSON
 def salvar_usuarios(usuarios):
-    # Reescreve o json, com a nova lista passada
     with open('usuarios.json', "w") as arq:
-        return json.dump(usuarios,arq,indent=4)
+        return json.dump(usuarios, arq, indent=4)
 
-# Funções para os widgets
+# Função que detecta o rosto no frame, recorta e salva apenas o rosto
+def detectar_rosto_e_salvar(frame, nome_arquivo):
+    try:
+        # Usa DeepFace para extrair rostos do frame
+        faces = DeepFace.extract_faces(img_path=frame, detector_backend='opencv', enforce_detection=True)
+
+        # Se não encontrar rostos, retorna False
+        if not faces:
+            return False
+
+        # Pega o primeiro rosto detectado
+        rosto = faces[0]['face']
+
+        # Se a imagem estiver em float (0 a 1), converte para 8 bits (0 a 255)
+        if rosto.dtype != 'uint8':
+            rosto = (rosto * 255).astype('uint8')
+
+        # Converte de RGB para BGR (formato padrão do OpenCV)
+        rosto = cv2.cvtColor(rosto, cv2.COLOR_RGB2BGR)
+
+        # Define caminho de salvamento e salva imagem do rosto
+        caminho_imagem = os.path.join('rostos', nome_arquivo)
+        cv2.imwrite(caminho_imagem, rosto)
+        return True
+
+    except Exception as e:
+        print(f"[ERRO AO DETECTAR ROSTO]: {e}")
+        return False
+
+# Função que permite cadastrar um novo rosto
 def cadastrarRosto():
-    # Nome do usuário a ser adicionado
+    # Solicita o nome do usuário
     nome = simpledialog.askstring("Cadastro", "Digite o nome do usuário a ser adicionado: ")
 
-    # Verifica se não está vazio
+    # Verifica se o nome não está vazio
     if not nome:
         messagebox.showwarning("Aviso", "O nome do usuário não pode ser vazio")
         return
-    
-    # Carrega a lista de usuarios e pega o nome deles
-    usuarios = carregar_usuarios_json()
-    nomes = []
-    for usuario in usuarios:
-        nomes.append(usuario['nome'])
 
-    # Tenta abrir a câmera
+    # Carrega a lista de usuários existente
+    usuarios = carregar_usuarios_json()
+
     try:
-        cam = cv2.VideoCapture(0)
+        cam = cv2.VideoCapture(0)  # Tenta abrir a webcam
     except:
         messagebox.showerror("Erro", "Não foi possível acessar a webcam")
         return
-    
+
     messagebox.showinfo("Instruções", "Aperte espaço para capturar a foto e ESC para cancelar") 
 
+    # Loop de captura da câmera
     while True:
-        # Leitura da câmera aberta
-        ret,frame = cam.read()
-
-        # Se ret retorna false, significa que não foi possível ler a camera
+        ret, frame = cam.read()
         if not ret:
             messagebox.showerror("Erro", "Falha ao capturar imagem")
             cam.release()
             return
-        
+
+        # Exibe o frame ao vivo
         cv2.imshow("Captura de rosto - pressione espaço para foto", frame)
 
-        # Se o usuário aperta ESC, fecha a câmera
-        if cv2.waitKey(1) == 27:
+        tecla = cv2.waitKey(1)
+        if tecla == 27:  # Tecla ESC para cancelar
             cam.release()
             cv2.destroyAllWindows()
             return
         
-        # Se ele aperta ESPAÇO, tira a foto e salva ela
-        elif cv2.waitKey(1) == 32:
-            # Formata o nome do arquivo no padrão
+        elif tecla == 32:  # Tecla ESPAÇO tira a foto
+
+            # Gera nome único para o arquivo da imagem
             data_atual = datetime.now().strftime("%Y%m%d%H%M%S")
             nome_arquivo = f'{nome}_{data_atual}.jpg'
-            
-            # Pega o caminho da imagem, e salva a foto com o nome do arquivo no caminho citado
-            caminho_imagem = os.path.join('rostos',nome_arquivo)
-            cv2.imwrite(caminho_imagem,frame)
+
+            # Garante que a pasta 'rostos' exista
+            if not os.path.exists('rostos'):
+                os.makedirs('rostos')
+
+            # Tenta detectar o rosto e salvar
+            sucesso = detectar_rosto_e_salvar(frame, nome_arquivo)
             cam.release()
             cv2.destroyAllWindows()
 
-            # Cria o usuário novo, adiciona ele e recarrega a lista de usuários
+            # Se não conseguir detectar o rosto
+            if not sucesso:
+                messagebox.showerror("Erro", "Nenhum rosto detectado. Tente novamente!")
+                return
+
+            # Cria o dicionário do novo usuário e salva
             usuario_novo = {
                 "nome": nome,
-                "arquivo" : nome_arquivo
+                "arquivo": nome_arquivo
             }
 
+            # Adiciona o usuário na lista de usuários
             usuarios.append(usuario_novo)
+
+            # Salva os usuários atuais
             salvar_usuarios(usuarios)
 
             messagebox.showinfo("Sucesso", f"Usuário {nome} cadastrado com sucesso!")
             carregar_usuarios_janela()
             return
 
+# Função para remover rosto selecionado da lista
 def removerRosto():
-    # Pega o usuário que foi selecionado
+
+    # Verifica qual usuário foi selecionado
     selecionado = lista_usuarios.curselection()
     if not selecionado:
         messagebox.showwarning("Aviso", "Selecione um usuário para excluir")
         return
-    
-    # Caso tenha selecionado mais de um, pega apenas o primeiro
+
+    # Pega as informações desse usuário
     index = selecionado[0]
-
-    # Lista de usuários atual
     usuarios = carregar_usuarios_json()
-
-    # Usuário atual
     usuario_remover = usuarios[index]
 
+    # Confirmação antes de excluir
     confirm = messagebox.askyesno("Confirmação", f"Excluir usuário {usuario_remover['nome']}?")
     if not confirm:
         return
 
-    # Pega o nome do arquivo da foto do usuário, verifica sua existência e remove ele
-    caminho_imagem = os.path.join('rostos',usuario_remover    ["arquivo"])
+    # Remove a imagem do rosto se existir
+    caminho_imagem = os.path.join('rostos', usuario_remover["arquivo"])
     if os.path.exists(caminho_imagem):
         os.remove(caminho_imagem)
 
-    # Remove o usuário da lista e salva a lista nova, sem o usuário no json
+    # Remove o usuário do JSON
     usuarios.pop(index)
+
+    # Salva os usuários sem o usuário excluido
     salvar_usuarios(usuarios)
     messagebox.showinfo("Sucesso", "Usuário excluído com sucesso!")
-
-    # Recarrega a nova lista
     carregar_usuarios_janela()
 
-
+# Atualiza a listbox com os usuários salvos
 def carregar_usuarios_janela():
-    # Deleta os valores que estavam na antiga ListBox
-    lista_usuarios.delete(0,END)
-
-    # Adiciona novos valores a ListBox baseado no json
+    lista_usuarios.delete(0, END)
     usuarios = carregar_usuarios_json()
     for usuario in usuarios:
-        lista_usuarios.insert(END,usuario['nome'])
+        lista_usuarios.insert(END, usuario['nome'])
 
-
-# Tela De Senha
+# Tela de login: pede a senha do administrador
 def pedir_senha():
-    # Cria uma mini tela para pedir a senha, verifica se a senha digitada esta correta, se sim passa para tela principal, se não pede novamente a senha
 
+    # Cria tela pra escrever a senha
     senha = simpledialog.askstring("Login", "Digite a senha de administrador", show='*')
 
+    # Faz a verificação da senha
     if senha is None:
         janela.destroy()
         return
-
+    
     if check_password_hash(PASSWORD, senha):
         principal()
-
+        
     else:
         messagebox.showerror("Erro", "Credencial Incorreta!")
-        janela.after(100,pedir_senha)
+        janela.after(100, pedir_senha)
 
-# Tela Principal
+# Interface principal do sistema (após login)
 def principal():
-    # Limpar a Tela
+
+    # Limpa os widgets antigos da janela
     for _ in janela.winfo_children():
         _.destroy()
-    
-    # Criação dos Widgets
-    Label(janela,text="Sistema de Gerenciamento de Rostos",font="Ivy 14").place(x=10,y=10)
 
-    Button(janela,text="Cadastrar Rosto",font="Ivy 10",command=cadastrarRosto,width=12).place(x=15,y=60)
+    # Título
+    Label(janela, text="Sistema de Gerenciamento de Rostos", font="Ivy 14").place(x=10, y=10)
 
-    Button(janela,text="Remover Rosto",font="Ivy 10",command=removerRosto,width=12).place(x=225,y=60)
-    
-    # Criação da ListBox, onde fica a lista de usuários
+    # Botão para cadastrar novo rosto
+    Button(janela, text="Cadastrar Rosto", font="Ivy 10", command=cadastrarRosto, width=12).place(x=15, y=60)
+
+    # Botão para remover rosto selecionado
+    Button(janela, text="Remover Rosto", font="Ivy 10", command=removerRosto, width=12).place(x=225, y=60)
+
+    # Lista de usuários cadastrados
     global lista_usuarios
-    lista_usuarios = Listbox(janela,height=15,width=35)
-    lista_usuarios.place(x=65,y=120)
+    lista_usuarios = Listbox(janela, height=15, width=35)
+    lista_usuarios.place(x=65, y=120)
 
-    # Atualizar dps
+    # Scrollbar para a lista
     scroll = Scrollbar(janela)
     scroll.place(x=290, y=120, height=245) 
     lista_usuarios.config(yscrollcommand=scroll.set)
     scroll.config(command=lista_usuarios.yview)
 
+    # Carrega os usuários na lista
     carregar_usuarios_janela()
 
-# Abre a tela de senha, assim que o comando inicia
-janela.after(100,pedir_senha)
+# Inicia pedindo a senha assim que o programa abre
+janela.after(100, pedir_senha)
 
+# Inicia o loop principal da janela Tkinter
 janela.mainloop()
